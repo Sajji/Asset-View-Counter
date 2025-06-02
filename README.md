@@ -1,5 +1,7 @@
 # Asset-View-Counter
 
+Purpose: This is a simple page counter to keep track of asset page views. The code leverages the API to increment each asset's page views attribute. That attribute is an integer type and will increment on every page visit. I say "simple" because it will increment the counter even if you refresh the browser window. So it's not session or cookie based. Also note that we need to use a single authentication credential to prevent average view-only users from being counted as authors. I kept the javascript code in a separate file so as to minimize alterations of the index.html code. Instructions below:
+
 1. Import the counterDataSet.cma file into your environment
 
 2. Copy the pageViews.js and pageViewAuth.json files to the /collibra_data/dgc/images folder
