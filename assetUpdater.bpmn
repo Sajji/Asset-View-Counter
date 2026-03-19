@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" xmlns:design="http://flowable.org/design" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://www.collibra.com/apiv2" exporter="Flowable Design" exporterVersion="2025.1.08" design:palette="flowable-core-process-palette">
+  <process id="pageViewUpdate" name="Page View Update" isExecutable="true" flowable:candidateStarterGroups="flowableUser">
+    <extensionElements>
+      <design:stencilid><![CDATA[BPMNDiagram]]></design:stencilid>
+      <design:creationdate><![CDATA[2026-03-19T18:15:01.856Z]]></design:creationdate>
+      <design:modificationdate><![CDATA[2026-03-19T19:53:57.772Z]]></design:modificationdate>
+    </extensionElements>
+    <scriptTask id="ScriptTask_1" name="Increment Page View Count on Current Asset" scriptFormat="groovy" flowable:autoStoreVariables="false">
+      <extensionElements>
+        <design:stencilid><![CDATA[ScriptTask]]></design:stencilid>
+      </extensionElements>
+      <script><![CDATA[import com.collibra.dgc.core.api.dto.instance.attribute.AddAttributeRequest
+import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest;
+import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest
+import com.collibra.dgc.core.api.dto.instance.asset.ChangeAssetRequest
+
+
+def curPageViewCountUuid = attributeTypeApi.getAttributeTypeByName("Page Views").getId()
+
+if (execution.getVariable('newPageViewCount')) {
+    assetApi.setAssetAttributes(SetAssetAttributesRequest.builder()
+        .assetId(item.getId())
+        .typeId(curPageViewCountUuid)
+        .values([newPageViewCount])
+        .build())
+}
+
+
+def curPageViewCountFound = attributeApi.findAttributes(
+    FindAttributesRequest.builder()
+        .typeIds([curPageViewCountUuid])
+        .assetId(item.getId())
+        .build()
+).getResults()
+
+def newPageViewCount
+if (curPageViewCountFound.isEmpty()) {
+    // First time — no attribute exists yet
+    newPageViewCount = 1
+} else {
+    // Attribute exists — read current value and increment
+    def currentValue = curPageViewCountFound[0].getValue()
+    newPageViewCount = currentValue.toInteger() + 1
+}
+
+execution.setVariable('newPageViewCount', newPageViewCount)
+
+assetApi.setAssetAttributes(SetAssetAttributesRequest.builder()
+    .assetId(item.getId())
+    .typeId(curPageViewCountUuid)
+    .values([newPageViewCount])
+    .build())]]></script>
+    </scriptTask>
+    <startEvent id="startnoneevent1" name="Start" flowable:initiator="initiator">
+      <extensionElements>
+        <design:stencilid><![CDATA[StartNoneEvent]]></design:stencilid>
+        <design:display_ref_in_diagram><![CDATA[true]]></design:display_ref_in_diagram>
+      </extensionElements>
+    </startEvent>
+    <endEvent id="EndNoneEvent_3" name="End">
+      <extensionElements>
+        <design:stencilid><![CDATA[EndNoneEvent]]></design:stencilid>
+        <design:display_ref_in_diagram><![CDATA[true]]></design:display_ref_in_diagram>
+      </extensionElements>
+    </endEvent>
+    <sequenceFlow id="SequenceFlow_4" sourceRef="ScriptTask_1" targetRef="EndNoneEvent_3">
+      <extensionElements>
+        <design:stencilid><![CDATA[SequenceFlow]]></design:stencilid>
+      </extensionElements>
+    </sequenceFlow>
+    <sequenceFlow id="SequenceFlow_2" sourceRef="startnoneevent1" targetRef="ScriptTask_1">
+      <extensionElements>
+        <design:stencilid><![CDATA[SequenceFlow]]></design:stencilid>
+      </extensionElements>
+    </sequenceFlow>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_pageViewUpdate">
+    <bpmndi:BPMNPlane bpmnElement="pageViewUpdate" id="BPMNPlane_pageViewUpdate">
+      <bpmndi:BPMNShape bpmnElement="ScriptTask_1" id="BPMNShape_ScriptTask_1">
+        <omgdc:Bounds height="80.0" width="100.0" x="515.0" y="235.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="startnoneevent1" id="BPMNShape_startnoneevent1">
+        <omgdc:Bounds height="30.0" width="30.0" x="314.0" y="260.0"></omgdc:Bounds>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds height="18.0" width="25.0" x="314.5" y="294.0"></omgdc:Bounds>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="EndNoneEvent_3" id="BPMNShape_EndNoneEvent_3">
+        <omgdc:Bounds height="28.0" width="28.0" x="992.6" y="261.0"></omgdc:Bounds>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds height="18.0" width="21.0" x="1227.1" y="293.0"></omgdc:Bounds>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="SequenceFlow_4" id="BPMNEdge_SequenceFlow_4" flowable:sourceDockerX="50.0" flowable:sourceDockerY="40.0" flowable:targetDockerX="14.0" flowable:targetDockerY="14.0">
+        <omgdi:waypoint x="615.0" y="275.0"></omgdi:waypoint>
+        <omgdi:waypoint x="917.0" y="275.0"></omgdi:waypoint>
+        <omgdi:waypoint x="917.0" y="267.0"></omgdi:waypoint>
+        <omgdi:waypoint x="992.6554721255976" y="273.7549528683569"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="SequenceFlow_2" id="BPMNEdge_SequenceFlow_2" flowable:sourceDockerX="15.0" flowable:sourceDockerY="15.0" flowable:targetDockerX="50.0" flowable:targetDockerY="40.0">
+        <omgdi:waypoint x="344.0" y="275.0"></omgdi:waypoint>
+        <omgdi:waypoint x="515.0" y="275.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

@@ -1,89 +1,97 @@
 (function () {
   const assetPathRegex = /\/asset\/([0-9a-fA-F\-]{36})/;
 
-  // Set this path to where you put your credentials JSON
-  const authFileUrl = "/resources/images/pageViewsAuth.json";
-  let credentials = null;
+  // Workflow name to look up — must match exactly
+  const WORKFLOW_NAME = "Page View Update";
 
-  async function loadCredentials() {
-    if (credentials) return credentials; // Cache after first load
-    const resp = await fetch(authFileUrl, { credentials: "same-origin" });
-    if (!resp.ok) throw new Error("Failed to load credentials JSON");
-    credentials = await resp.json();
-    return credentials;
+  // Session-scoped cache so we only look these up once per page load
+  let cachedCsrfToken = null;
+  let cachedWorkflowDefinitionId = null;
+
+  async function getCsrfToken() {
+    if (cachedCsrfToken) return cachedCsrfToken;
+    const resp = await fetch(
+      `${window.location.origin}/rest/2.0/auth/sessions/current?include=csrfToken`,
+      { credentials: "include" }
+    );
+    if (!resp.ok) throw new Error(`Failed to fetch CSRF token: ${resp.status}`);
+    const data = await resp.json();
+    cachedCsrfToken = data.csrfToken;
+    return cachedCsrfToken;
   }
 
-  function getBasicAuthHeader(username, password) {
-    return "Basic " + btoa(`${username}:${password}`);
+  async function getWorkflowDefinitionId(csrfToken) {
+    if (cachedWorkflowDefinitionId) return cachedWorkflowDefinitionId;
+    const url = `${window.location.origin}/rest/2.0/workflowDefinitions?offset=0&limit=1&countLimit=-1`
+      + `&name=${encodeURIComponent(WORKFLOW_NAME)}&sortOrder=ASC&sortField=NAME`;
+    const resp = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "X-CSRF-TOKEN": csrfToken
+      },
+      credentials: "include"
+    });
+    if (!resp.ok) throw new Error(`Failed to fetch workflow definition: ${resp.status}`);
+    const data = await resp.json();
+    if (!data.results || data.results.length === 0) {
+      throw new Error(`No workflow definition found with name: "${WORKFLOW_NAME}"`);
+    }
+    cachedWorkflowDefinitionId = data.results[0].id;
+    return cachedWorkflowDefinitionId;
   }
 
-  async function updateViewz(uuid) {
+  async function triggerPageViewWorkflow(uuid) {
     try {
-      const { username, password } = await loadCredentials();
+      const csrfToken = await getCsrfToken();
+      const workflowDefinitionId = await getWorkflowDefinitionId(csrfToken);
 
-      const attributesUrl = `${window.location.origin}/rest/2.0/attributes?assetId=${uuid}`;
-      const getResp = await fetch(attributesUrl, {
-        headers: {
-          "Authorization": getBasicAuthHeader(username, password)
-        },
-        credentials: "include"
-      });
-      if (!getResp.ok) throw new Error(`Failed to fetch attributes: ${getResp.status}`);
+      const workflowUrl = `${window.location.origin}/rest/2.0/workflowInstances`;
 
-      const data = await getResp.json();
-      const viewzAttr = data.results.find(attr => attr.type?.name === "Page Views");
+      const payload = {
+        workflowDefinitionId,
+        businessItemIds: [uuid],
+        businessItemType: "ASSET"
+      };
 
-      if (!viewzAttr) {
-        console.log("❌ No 'Viewz' attribute found for this asset. Attempting to create one...");
+      const headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-TOKEN": csrfToken
+      };
 
-        const createResp = await fetch(`${window.location.origin}/rest/2.0/attributes/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": getBasicAuthHeader(username, password)
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            assetId: uuid,
-            typePublicId: "Viewz_C",
-            value: 1
-          })
-        });
+      // --- Debug: log everything before the request fires ---
+      console.group("📊 Page View Workflow Request");
+      console.log("Workflow Definition ID:", workflowDefinitionId);
+      console.log("URL:    ", workflowUrl);
+      console.log("Headers:", headers);
+      console.log("Payload:", JSON.stringify(payload, null, 2));
+      console.groupEnd();
 
-        if (!createResp.ok) {
-          throw new Error(`❌ Failed to create 'Viewz' attribute: ${createResp.status}`);
-        }
-
-        console.log(`✅ 'Viewz' attribute created with value 1.`);
-        return;
-      }
-
-      const currentValue = viewzAttr.value || 0;
-      const newValue = currentValue + 1;
-      const attrId = viewzAttr.id;
-      const patchUrl = `${window.location.origin}/rest/2.0/attributes/${attrId}`;
-
-      const patchResp = await fetch(patchUrl, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": getBasicAuthHeader(username, password)
-        },
+      const resp = await fetch(workflowUrl, {
+        method: "POST",
+        headers,
         credentials: "include",
-        body: JSON.stringify({ value: newValue })
+        body: JSON.stringify(payload)
       });
 
-      if (!patchResp.ok) throw new Error(`Failed to patch Viewz: ${patchResp.status}`);
-      console.log(`✅ 'Viewz' updated from ${currentValue} → ${newValue}`);
+      // --- Debug: log the response ---
+      console.group("📊 Page View Workflow Response");
+      console.log("Status:", resp.status, resp.statusText);
+      const responseText = await resp.text();
+      console.log("Body:  ", responseText);
+      console.groupEnd();
+
+      if (!resp.ok) throw new Error(`Workflow POST failed: ${resp.status} — ${responseText}`);
+      console.log(`✅ Page view recorded for asset ${uuid}`);
     } catch (error) {
-      console.error("⚠️ Error updating Viewz:", error);
+      console.error("⚠️ Error recording page view:", error);
     }
   }
 
   function handleUrlChange() {
     const match = window.location.pathname.match(assetPathRegex);
     if (match && match[1]) {
-      updateViewz(match[1]);
+      triggerPageViewWorkflow(match[1]);
     }
   }
 
@@ -91,11 +99,11 @@
   const originalPushState = history.pushState;
   history.pushState = function (...args) {
     originalPushState.apply(this, args);
-    window.dispatchEvent(new Event('urlchange'));
+    window.dispatchEvent(new Event("urlchange"));
   };
 
-  window.addEventListener('popstate', handleUrlChange);
-  window.addEventListener('urlchange', handleUrlChange);
+  window.addEventListener("popstate", handleUrlChange);
+  window.addEventListener("urlchange", handleUrlChange);
 
   // Initial page load
   handleUrlChange();
