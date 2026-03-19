@@ -2,15 +2,13 @@
 
 Purpose: This is a simple page counter to keep track of asset page views. The code leverages the API to increment each asset's page views attribute. That attribute is an integer type and will increment on every page visit. I say "simple" because it will increment the counter even if you refresh the browser window. So it's not session or cookie based. Also note that we need to use a single authentication credential to prevent average view-only users from being counted as authors. I kept the javascript code in a separate file so as to minimize alterations of the index.html code. Instructions below:
 
-1. Import the PageViews.cma file into your environment
+1. Import the PageViews.cma file and the assetUpdater.bpmn workflow into your environment
 
-2. Copy the pageViews.js and pageViewAuth.json files to the /collibra_data/dgc/images folder
+2. Copy the pageViews.js file to the /collibra_data/dgc/images folder
 
-3. Edit the pageViewAuth.json file appropriately.
+3. Edit /collibra_data/dgc/static/banyan/index.html
 
-4. Edit /collibra_data/dgc/static/banyan/index.html
-
-5. Add the following script code right above the `</body>` tag at the bottom of the index.html:
+4. Add the following script code right above the `</body>` tag at the bottom of the index.html:
 
 `<script th:src="@{${'/resources/images/pageViews.js'}}" th:attr="nonce=${cspNonce}"></script>  `
 
